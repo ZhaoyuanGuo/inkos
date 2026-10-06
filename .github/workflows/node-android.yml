@@ -882,17 +882,38 @@ jobs:
               # member function bodies. We use this-> qualification to make them
               # dependent (deferred to phase 2).
               #
-              # 1. matcher_ declaration at line ~5636 is AFTER the constructor
-              # at line ~1549. GCC requires data members referenced in member
-              # initializer lists to be declared BEFORE the constructor (phase 1
-              # lookup). Clang defers lookup. So we move matcher_ before the
-              # constructor and keep the initializer list as-is.
+              # 1. matcher_ declaration is AFTER the constructor in the class
+              # body. Clang (NDK) rejects mem-initializers that reference
+              # members declared later (mem-initializers are NOT a
+              # complete-class context); GCC tolerates it. So we move matcher_
+              # before the constructor and keep the initializer list as-is.
+              #
+              # Node v24.21.0 (V8 14.x) has NO TURBOSHAFT_REDUCER_BOILERPLATE
+              # in this class; the class body opens with the Asm using-
+              # declaration (unique in this file). Anchor on that instead, and
+              # fail loudly if the source ever reshapes (a silent no-op here
+              # deletes the field in step 2 and produces a cryptic compile
+              # failure ~40 minutes later).
+              anchor = '  using GenericAssemblerOpInterface<Assembler>::Asm;\n\n  template <typename... Args>'
+              if s.count(anchor) != 1:
+                  raise SystemExit(
+                      f'::error::matcher_ move: anchor found {s.count(anchor)} times (expected 1)')
               s = s.replace(
-                  '  TURBOSHAFT_REDUCER_BOILERPLATE(AssemblerOpInterface)\n\n  template <typename... Args>',
-                  '  TURBOSHAFT_REDUCER_BOILERPLATE(AssemblerOpInterface)\n\n  OperationMatcher matcher_;\n\n  template <typename... Args>')
+                  anchor,
+                  '  using GenericAssemblerOpInterface<Assembler>::Asm;\n\n'
+                  '  OperationMatcher matcher_;\n\n'
+                  '  template <typename... Args>')
+              before = s.count('  OperationMatcher matcher_;')
               s = s.replace('  OperationMatcher matcher_;\n};', '};')
+              after = s.count('  OperationMatcher matcher_;')
+              if not (before == 2 and after == 1):
+                  raise SystemExit(
+                      f'::error::matcher_ move failed: declarations before={before} after={after}')
 
               # 2. matcher_ in body getter (this-> is still needed for CRTP)
+              if s.count('{ return matcher_; }') != 1:
+                  raise SystemExit(
+                      '::error::matcher_ getter not found exactly once in assembler.h')
               s = s.replace('{ return matcher_; }', '{ return this->matcher_; }')
 
               # 3. ReduceIfReachable calls — qualify call sites ONLY.
