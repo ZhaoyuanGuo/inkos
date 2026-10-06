@@ -1798,3 +1798,5 @@ jobs:
           name: ${{ env.LIB_NAME }}-v${{ env.RESOLVED_NODE_VERSION }}-android-${{ matrix.abi }}-${{ matrix.build_mode }}-${{ matrix.intl }}
           path: ${{ env.LIB_NAME }}-v${{ env.RESOLVED_NODE_VERSION }}-android-${{ matrix.abi }}-${{ matrix.build_mode }}-${{ matrix.intl }}
           retention-days: 14
+
+# CI re-trigger marker: 2026-10-06T14:05:13.9023734+08:00
